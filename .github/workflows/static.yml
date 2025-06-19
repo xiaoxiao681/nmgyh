@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>礼品兑付登记系统</title>
+  <style>
+    body { font-family: sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+    .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px #ccc; }
+    h2 { text-align: center; margin-bottom: 20px; }
+    input, select, textarea, button { width: 100%; padding: 8px; margin: 6px 0; border-radius: 5px; border: 1px solid #ccc; }
+    button { cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background-color: #f2f2f2; }
+    tr.disabled { background-color: #eee; color: #999; }
+    .btn-inline { cursor: pointer; margin: 0 5px; text-decoration: underline; }
+    .btn-approve { color: green; }
+    .btn-request { color: orange; }
+    .btn-delete { color: red; }
+    .btn-edit { color: blue; }
+    #loginSection, #changePwdSection, #addRecordSection { margin-bottom: 20px; }
+    #logoutBtn { float: right; margin-top: -40px; }
+    #logSection { margin-top: 30px; background: #fafafa; border: 1px solid #ccc; padding: 10px; height: 150px; overflow-y: auto; font-size: 12px; white-space: pre-wrap; }
+    /* 弹窗样式 */
+    #editModal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+    #editModalContent { background: white; padding: 20px; border-radius: 8px; max-width: 400px; width: 90%; }
+    #editModalContent h3 { margin-top: 0; }
+    #editModalContent button { width: auto; margin-right: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>礼品兑付登记系统</h2>
+
+    <!-- 登录 -->
+    <div id="loginSection">
+      <h3>登录</h3>
+      <label>用户名：<input type="text" id="loginUser" /></label>
+      <label>密码：<input type="password" id="loginPass" /></label>
+      <button id="loginBtn">登录</button>
+      <p id="loginMsg" style="color:red;"></p>
+    </div>
+
+    <!-- 登出 -->
+    <button id="logoutBtn" style="display:none;">退出登录</button>
+
+    <!-- 密码修改 -->
+    <div id="changePwdSection" style="display:none;">
+      <h3>修改密码</h3>
+      <form id="changePwdForm">
+        <label>旧密码：<input type="password" id="oldPwd" required /></label>
+        <label>新密码：<input type="password" id="newPwd" required /></label>
+        <label>确认新密码：<input type="password" id="confirmPwd" required /></label>
+        <button type="submit">确认修改</button>
+      </form>
+      <p id="pwdMsg" style="color:red;"></p>
+    </div>
+
+    <!-- 添加记录 -->
+    <div id="addRecordSection" style="display:none;">
+      <h3>新增记录</h3>
+      <form id="addForm">
+        <label>日期：<input type="date" id="date" required /></label>
+        <label>客户姓名：<input type="text" id="name" required /></label>
+        <label>业务类型：
+          <select id="type" required>
+            <option value="定期一年">定期一年</option>
+            <option value="定期二年">定期二年</option>
+            <option value="定期三年">定期三年</option>
+            <option value="定期五年">定期五年</option>
+          </select>
+        </label>
+        <label>积分：<input type="number" id="points" min="0" required /></label>
+        <label>消耗积分：<input type="number" id="usedPoints" min="0" required /></label>
+        <label>礼品名称：<input type="text" id="gift" required /></label>
+        <label>客户经理：<input type="text" id="manager" /></label>
+        <label>备注：<textarea id="notes"></textarea></label>
+        <button type="submit">登记</button>
+      </form>
+    </div>
+
+    <!-- 搜索 -->
+    <div id="searchSection" style="display:none;">
+      <input type="text" id="searchInput" placeholder="搜索客户姓名或礼品名称" />
+    </div>
+
+    <!-- 记录表 -->
+    <table id="recordsTable" style="display:none;">
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>客户姓名</th>
+          <th>业务类型</th>
+          <th>积分</th>
+          <th>消耗积分</th>
+          <th>剩余积分</th>
+          <th>礼品名称</th>
+          <th>客户经理</th>
+          <th>备注</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="recordsTableBody"></tbody>
+    </table>
+
+    <!-- 操作日志 -->
+    <div id="logSection" style="display:none;"></div>
+
+    <!-- 弹窗编辑 -->
+    <div id="editModal">
+      <div id="editModalContent">
+        <h3>编辑记录</h3>
+        <form id="editForm">
+          <label>日期：<input type="date" id="editDate" required /></label>
+          <label>客户姓名：<input type="text" id="editName" required /></label>
+          <label>业务类型：
+            <select id="editType" required>
+              <option value="定期一年">定期一年</option>
+              <option value="定期二年">定期二年</option>
+              <option value="定期三年">定期三年</option>
+              <option value="定期五年">定期五年</option>
+            </select>
+          </label>
+          <label>积分：<input type="number" id="editPoints" min="0" required /></label>
+          <label>消耗积分：<input type="number" id="editUsedPoints" min="0" required /></label>
+          <label>礼品名称：<input type="text" id="editGift" required /></label>
+          <label>客户经理：<input type="text" id="editManager" /></label>
+          <label>备注：<textarea id="editNotes"></textarea></label>
+          <button type="submit">保存</button>
+          <button type="button" id="editCancelBtn">取消</button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // 模拟账号密码及角色：5个记录员(clerk1~5)，2个管理员(admin1~2)，初始密码均为123456
+    const users = {
+      clerk1: { password: "123456", role: "clerk" },
+      clerk2: { password: "123456", role: "clerk" },
+      clerk3: { password: "123456", role: "clerk" },
+      clerk4: { password: "123456", role: "clerk" },
+      clerk5: { password: "123456", role: "clerk" },
+      admin1: { password: "123456", role: "admin" },
+      admin2: { password: "123456", role: "admin" },
+    };
+
+    let currentUser = null;
+    let currentRole = null;
+    let editRecordIndex = null;
+
+    const loginSection = document.getElementById("loginSection");
+    const loginUser = document.getElementById("loginUser");
+    const loginPass = document.getElementById("loginPass");
+    const loginBtn = document.getElementById("loginBtn");
+    const loginMsg = document.getElementById("loginMsg");
+
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    const changePwdSection = document.getElementById("changePwdSection");
+    const changePwdForm = document.getElementById("changePwdForm");
+    const oldPwd = document.getElementById("oldPwd");
+    const newPwd = document.getElementById("newPwd");
+    const confirmPwd = document.getElementById("confirmPwd");
+    const pwdMsg = document.getElementById("pwdMsg");
+
+    const addRecordSection = document.getElementById("addRecordSection");
+    const addForm = document.getElementById("addForm");
+    const dateInput = document.getElementById("date");
+    const nameInput = document.getElementById("name");
+    const typeInput = document.getElementById("type");
+    const pointsInput = document.getElementById("points");
+    const usedPointsInput = document.getElementById("usedPoints");
+    const giftInput = document.getElementById("gift");
+    const managerInput = document.getElementById("manager");
+    const notesInput = document.getElementById("notes");
+
+    const searchSection = document.getElementById("searchSection");
+    const searchInput = document.getElementById("searchInput");
+
+    const recordsTable = document.getElementById("recordsTable");
+    const recordsTableBody = document.getElementById("recordsTableBody");
+
+    const logSection = document.getElementById("logSection");
+
+    // 编辑弹窗
+    const editModal = document.getElementById("editModal");
+    const editForm = document.getElementById("editForm");
+    const editDate = document.getElementById("editDate");
+    const editName = document.getElementById("editName");
+    const editType = document.getElementById("editType");
+    const editPoints = document.getElementById("editPoints");
+    const editUsedPoints = document.getElementById("editUsedPoints");
+    const editGift = document.getElementById("editGift");
+    const editManager = document.getElementById("editManager");
+    const editNotes = document.getElementById("editNotes");
+    const editCancelBtn = document.getElementById("editCancelBtn");
+
+    function log(msg) {
+      const time = new Date().toLocaleString();
+      logSection.textContent += `[${time}] ${msg}\n`;
+      logSection.scrollTop = logSection.scrollHeight;
+      localStorage.setItem("operationLog", logSection.textContent);
+    }
+
+    // 载入日志
+    window.onload = function () {
+      const savedLog = localStorage.getItem("operationLog");
+      if (savedLog) logSection.textContent = savedLog;
+    };
+
+    // 登录处理
+    loginBtn.onclick = function () {
+      const user = loginUser.value.trim();
+      const pass = loginPass.value;
+
+      if (!user || !pass) {
+        loginMsg.textContent = "用户名和密码不能为空";
+        return;
+      }
+      if (!users[user]) {
+        loginMsg.textContent = "用户名不存在";
+        return;
+      }
+      if (users[user].password !== pass) {
+        loginMsg.textContent = "密码错误";
+        return;
+      }
+      currentUser = user;
+      currentRole = users[user].role;
+
+      loginMsg.textContent = "";
+      loginSection.style.display = "none";
+      logoutBtn.style.display = "inline-block";
+      changePwdSection.style.display = "block";
+      addRecordSection.style.display = currentRole === "clerk" ? "block" : "none";
+      searchSection.style.display = "block";
+      recordsTable.style.display = "table";
+      logSection.style.display = "block";
+
+      log(`用户 ${currentUser} 登录，身份：${currentRole}`);
+
+      loadRecords();
+    };
+
+    // 登出
+    logoutBtn.onclick = function () {
+      log(`用户 ${currentUser} 登出`);
+      currentUser = null;
+      currentRole = null;
+
+      loginUser.value = "";
+      loginPass.value = "";
+      loginMsg.textContent = "";
+
+      loginSection.style.display = "block";
+      logoutBtn.style.display = "none";
+      changePwdSection.style.display = "none";
+      addRecordSection.style.display = "none";
+      searchSection.style.display = "none";
+      recordsTable.style.display = "none";
+      logSection.style.display = "none";
+    };
+
+    // 修改密码
+    changePwdForm.onsubmit = function (e) {
+      e.preventDefault();
+      pwdMsg.textContent = "";
+
+      const oldp = oldPwd.value;
+      const newp = newPwd.value;
+      const confp = confirmPwd.value;
+
+      if (oldp !== users[currentUser].password) {
+        pwdMsg.textContent = "旧密码不正确";
+        return;
+      }
+      if (newp.length < 6) {
+        pwdMsg.textContent = "新密码至少6位";
+        return;
+      }
+      if (newp !== confp) {
+        pwdMsg.textContent = "两次新密码不一致";
+        return;
+      }
+
+      users[currentUser].password = newp;
+      alert("密码修改成功，请重新登录");
+      logoutBtn.click();
+    };
+
+    // 新增记录
+    addForm.onsubmit = function (e) {
+      e.preventDefault();
+
+      const date = dateInput.value;
+      const name = nameInput.value.trim();
+      const type = typeInput.value;
+      const points = parseInt(pointsInput.value);
+      const usedPoints = parseInt(usedPointsInput.value);
+      const gift = giftInput.value.trim();
+      const manager = managerInput.value.trim();
+      const notes = notesInput.value.trim();
+
+      if (!date || !name || !gift) {
+        alert("日期、客户姓名、礼品名称为必填");
+        return;
+      }
+      if (points < 0 || usedPoints < 0) {
+        alert("积分和消耗积分不能为负数");
+        return;
+      }
+      if (usedPoints > points) {
+        alert("消耗积分不能大于积分");
+        return;
+      }
+
+      const records = JSON.parse(localStorage.getItem("records") || "[]");
+      records.push({
+        date,
+        name,
+        type,
+        points,
+        usedPoints,
+        remainingPoints: points - usedPoints,
+        gift,
+        manager,
+        notes,
+        requestEdit: false,  // 是否申请管理员批准修改
+        approvedEdit: false, // 管理员是否批准
+      });
+      localStorage.setItem("records", JSON.stringify(records));
+
+      log(`用户 ${currentUser} 新增记录：${name} / ${gift}`);
+      addForm.reset();
+      loadRecords();
+    };
+
+    // 搜索
+    searchInput.oninput = function () {
+      loadRecords();
+    };
+
+    // 载入记录表格，操作按钮根据角色和状态不同显示
+    function loadRecords() {
+      const records = JSON.parse(localStorage.getItem("records") || "[]");
+      const searchText = searchInput.value.trim().toLowerCase();
+      recordsTableBody.innerHTML = "";
+      records.forEach((r, i) => {
+        if (
+          r.name.toLowerCase().includes(searchText) ||
+          r.gift.toLowerCase().includes(searchText)
+        ) {
+          let ops = "";
+
+          if (currentRole === "admin") {
+            // 管理员只能审批申请修改
+            if (r.requestEdit) {
+              ops = `<span class="btn-inline btn-approve" onclick="approveEdit(${i})" title="批准记录修改">批准</span>`;
+            }
+          } else if (currentRole === "clerk") {
+            if (r.remainingPoints === 0) {
+              if (!r.approvedEdit) {
+                // 剩余积分0且未批准，显示申请修改或已申请中
+                ops = r.requestEdit
+                  ? `<span title="已申请管理员批准">申请中</span>`
+                  : `<span class="btn-inline btn-request" onclick="requestEdit(${i})" title="申请修改">申请修改</span>`;
+              } else {
+                // 已批准，显示编辑
+                ops = `<span class="btn-inline btn-edit" onclick="openEditModal(${i})" title="编辑记录">编辑</span>`;
+              }
+            } else {
+              // 剩余积分大于0，直接编辑
+              ops = `<span class="btn-inline btn-edit" onclick="openEditModal(${i})" title="编辑记录">编辑</span>`;
+            }
+          }
+          // 删除按钮所有人都可用
+          ops += `<span class="btn-inline btn-delete" onclick="deleteRecord(${i})" title="删除记录">删除</span>`;
+
+          const requestNote = r.requestEdit ? "（申请修改中）" : "";
+          const approvedNote = r.approvedEdit ? "（管理员已批准）" : "";
+
+          const row = document.createElement("tr");
+          if (r.remainingPoints === 0 && !r.approvedEdit) {
+            row.classList.add("disabled");
+          }
+          row.innerHTML = `
+            <td>${r.date}</td>
+            <td>${r.name}</td>
+            <td>${r.type}</td>
+            <td>${r.points}</td>
+            <td>${r.usedPoints}</td>
+            <td>${r.remainingPoints}</td>
+            <td>${r.gift}</td>
+            <td>${r.manager}</td>
+            <td>${r.notes} ${requestNote} ${approvedNote}</td>
+            <td>${ops}</td>
+          `;
+          recordsTableBody.appendChild(row);
+        }
+      });
+    }
+
+    // 申请修改（记录员）
+    function requestEdit(index) {
+      const records = JSON.parse(localStorage.getItem("records") || "[]");
+      const r = records[index];
+      if (r.requestEdit) {
+        alert("已申请管理员批准，等待审批");
+        return;
+      }
+      if (currentRole !== "clerk") {
+        alert("只有记录员可以申请修改");
+        return;
+      }
+      r.requestEdit = true;
+      localStorage.setItem("records", JSON.stringify(records));
+      alert("已向管理员申请修改，请等待审批");
+      log(`${currentUser} 申请修改记录：${r.name} / ${r.gift}`);
+      loadRecords();
+    }
+
+    // 管理员批准修改申请
+    function approveEdit(index) {
+      if (currentRole !== "admin") {
+        alert("只有管理员可以批准");
+        return;
+      }
+      const records = JSON.parse(localStorage.getItem("records") || "[]");
+      const r = records[index];
+      if (!r.requestEdit) {
+        alert("该记录未申请修改");
+        return;
+      }
+      r.approvedEdit = true;  // 管理员批准
+      r.requestEdit = false;  // 清除申请状态
+      localStorage.setItem("records", JSON.stringify(records));
+      alert("已批准该记录修改申请，记录员可编辑一次");
+      log(`${currentUser} 批准了记录修改申请：${r.name} / ${r.gift}`);
+      loadRecords();
+    }
+
+    // 删除记录
+    function deleteRecord(index) {
+      const records = JSON.parse(localStorage.getItem("records") || "[]");
+      const r = records[index];
+      if (!confirm(`确认删除记录：${r.name} / ${r.gift} ?`)) return;
+      records.splice(index, 1);
+      localStorage.setItem("records", JSON.stringify(records));
+      alert("删除成功");
+      log(`${currentUser} 删除了记录：${r.name} / ${r.gift}`);
+      loadRecords();
+    }
+
+    // 打开编辑弹窗
+    function openEditModal(index) {
+      const records = JSON.parse(localStorage.getItem("records") || "[]");
+      const r = records[index];
+      if (currentRole !== "clerk") {
+        alert("只有记录员可以编辑记录");
+        return;
+      }
+      if (r.remainingPoints === 0 && !r.approvedEdit) {
+        alert("剩余积分为0且未获管理员批准，无法编辑");
+        return;
+      }
+      editRecordIndex = index;
+      editDate.value = r.date;
+      editName.value = r.name;
+      editType.value = r.type;
+      editPoints.value = r.points;
+      editUsedPoints.value = r.usedPoints;
+      editGift.value = r.gift;
+      editManager.value = r.manager;
+      editNotes.value = r.notes;
+
+      editModal.style.display = "flex";
+    }
+
+    // 关闭编辑弹窗
+    editCancelBtn.onclick = () => {
+      editModal.style.display = "none";
+    };
+
+    // 编辑弹窗保存
+    editForm.onsubmit = function (e) {
+      e.preventDefault();
+
+      const date = editDate.value;
+      const name = editName.value.trim();
+      const type = editType.value;
+      const points = parseInt(editPoints.value);
+      const usedPoints = parseInt(editUsedPoints.value);
+      const gift = editGift.value.trim();
+      const manager = editManager.value.trim();
+      const notes = editNotes.value.trim();
+
+      if (!date || !name || !gift) {
+        alert("日期、客户姓名、礼品名称为必填");
+        return;
+      }
+      if (points < 0 || usedPoints < 0) {
+        alert("积分和消耗积分不能为负数");
+        return;
+      }
+      if (usedPoints > points) {
+        alert("消耗积分不能大于积分");
+        return;
+      }
+
+      const records = JSON.parse(localStorage.getItem("records") || "[]");
+      const r = records[editRecordIndex];
+
+      if (currentRole !== "clerk") {
+        alert("只有记录员可以保存编辑");
+        return;
+      }
+      if (r.remainingPoints === 0 && !r.approvedEdit) {
+        alert("剩余积分为0且未获管理员批准，无法编辑");
+        return;
+      }
+
+      r.date = date;
+      r.name = name;
+      r.type = type;
+      r.points = points;
+      r.usedPoints = usedPoints;
+      r.remainingPoints = points - usedPoints;
+      r.gift = gift;
+      r.manager = manager;
+      r.notes = notes;
+
+      // 编辑一次后，若之前管理员批准，则取消批准状态（只能编辑一次）
+      if (r.approvedEdit) {
+        r.approvedEdit = false;
+        r.requestEdit = false;
+      }
+
+      localStorage.setItem("records", JSON.stringify(records));
+      alert("保存成功");
+      log(`${currentUser} 编辑了记录：${name} / ${gift}`);
+      editModal.style.display = "none";
+      loadRecords();
+    };
+  </script>
+</body>
+</html>
